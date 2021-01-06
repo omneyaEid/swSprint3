@@ -13,6 +13,7 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 public class DBConnect {
     public static List<NotificationTemplat> EMAIL=new ArrayList<>();
@@ -28,7 +29,7 @@ public class DBConnect {
             Statement Stat = null;
             Con = DriverManager.getConnection(url, user, password);
             Stat = Con.createStatement();
-            System.out.println("yes");
+          //  System.out.println("yes");
             if(notification.getType().equals("Email")) {
                 String line = "INSERT INTO Email(id,content,type,language,subject) VALUES("
                         + "'" + notification.getId() + "',"
@@ -54,7 +55,7 @@ public class DBConnect {
             Con.close();
 
         } catch (ClassNotFoundException | SQLException e) {
-            System.out.println("no");
+            System.out.println("Failed Connection");
         }
     }
 
@@ -99,7 +100,7 @@ public class DBConnect {
             Con.close();
             return EmailAndSms;
         } catch (ClassNotFoundException | SQLException e) {
-            System.out.println("no");
+            System.out.println("Failed Connection");
         }
         return null;
     }
@@ -145,7 +146,7 @@ public class DBConnect {
 
 
         } catch (ClassNotFoundException | SQLException e) {
-            System.out.println("no");
+            System.out.println("Failed Connection");
         }
         return null;
     }
@@ -170,8 +171,8 @@ public class DBConnect {
             Statement Stat = null;
             Con = DriverManager.getConnection(url, user, password);
             Stat = Con.createStatement();
-            System.out.println("uuu");
-            System.out.println(type);
+            //System.out.println("uuu");
+           // System.out.println(type);
             if(type.equals("SMS")) {
 
                 String sql1 = "DELETE FROM SMS WHERE id ="+ids;
@@ -182,11 +183,11 @@ public class DBConnect {
                 String sql = "DELETE FROM Email WHERE id =" +ids ;
                 Stat.execute(sql);
             }
-            System.out.println("hello");
+            //System.out.println("hello");
             Stat.close();
             Con.close();
         }catch (ClassNotFoundException | SQLException e) {
-            System.out.println("nooooo");
+            System.out.println("Failed Connection");
         }
     }
     public int  Delete(int id)
@@ -243,10 +244,10 @@ public class DBConnect {
                 preparedStmt.setString(5, update.getSubject());
                 preparedStmt.executeUpdate();
             }
-            System.out.println("hello");
+            //System.out.println("hello");
 
         }catch (ClassNotFoundException | SQLException e) {
-            System.out.println("nooooo");
+            System.out.println("Failed Connection");
         }
     }
     public int update(int id,NotificationTemplat update)
@@ -274,7 +275,7 @@ public class DBConnect {
             Con = DriverManager.getConnection(url, user, password);
             Stat = Con.createStatement();
             PreparedStatement pstatement;
-            System.out.println(hold.getType());
+            //System.out.println(hold.getType());
             if(hold.getType().equals("SMS")) {
                 String sms = "Select * from SMS";
                 ResultSet rs1 = Stat.executeQuery(sms);
@@ -291,8 +292,6 @@ public class DBConnect {
                     NewContent = NewContent.replace("{y}", hold.getBook());
                     //insert(idHold,NewContent,subject,hold.getMailOrSMS());
                     updateDataBase(hold.getType(),id,NewContent,hold.getMailOrSMS());
-
-
 
                 }
             }
@@ -313,11 +312,11 @@ public class DBConnect {
                     NewContent = NewContent.replace("{y}", hold.getBook());
 
                     updateDataBase(hold.getType(),id,NewContent,hold.getMailOrSMS());
-                    ToSendMail(hold.getType());
+
                 }
             }
         }catch (ClassNotFoundException | SQLException e) {
-            System.out.println("nooooo");
+            System.out.println("Failed Connection");
         }
     }
     public void ToSendMail(String type)
@@ -341,6 +340,7 @@ public class DBConnect {
                     String content = rs1.getString("content");
                     String subject = rs1.getString("subject");
                     String mail = rs1.getString("sms");
+
                     //Send_Mail(mail, subject, content);
 
                 }
@@ -403,20 +403,52 @@ public class DBConnect {
             Con = DriverManager.getConnection(url, user, password);
             Stat = Con.createStatement();
             PreparedStatement pstatement;
-            System.out.println(id);
+            //System.out.println(id);
             if (type.equals("Email")) {
                 String sql = "UPDATE Email set content=?,email=? where id=" + id;
                 PreparedStatement preparedStmt = Con.prepareStatement(sql);
                 preparedStmt.setString(1,NewContent);
-                preparedStmt.setString(2,MailOrSMS);
-                preparedStmt.executeUpdate();
-            } else {
+                String emailRegex = "^[a-zA-Z0-9_+&*-]+(?:\\."+
+                        "[a-zA-Z0-9_+&*-]+)*@" +
+                        "(?:[a-zA-Z0-9-]+\\.)+[a-z" +
+                        "A-Z]{2,7}$";
+                Pattern p = Pattern.compile(emailRegex);
 
+                if (MailOrSMS == null)
+                {
+                    System.out.println("Failed");
+                }
+                if( p.matcher(MailOrSMS).matches())
+                {
+                    preparedStmt.setString(2,MailOrSMS);
+                    System.out.println("Sent Successfully");
+                    preparedStmt.executeUpdate();
+                    ToSendMail(type);
+                }
+                else
+                {
+                    System.out.println("Failed");
+                }
+
+            } else {
                 String sql = "UPDATE SMS set content=?,sms=? where id=" + id;
                 PreparedStatement preparedStmt = Con.prepareStatement(sql);
                 preparedStmt.setString(1,NewContent);
-                preparedStmt.setString(2,MailOrSMS);
-                preparedStmt.executeUpdate();
+                char ch1 = MailOrSMS.charAt(0);
+                char ch2 = MailOrSMS.charAt(1);
+                if(MailOrSMS.length()==11 && ch1=='0' && ch2=='1')
+                {
+                    preparedStmt.setString(2,MailOrSMS);
+                    System.out.println("Sent Successfully");
+                    preparedStmt.executeUpdate();
+                    deleteRow(type,id);
+                }
+                else
+                {
+                    System.out.println("Failed");
+                }
+
+
             }
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
@@ -501,12 +533,15 @@ public class DBConnect {
                 transport.connect(host, from, pass);
                 transport.sendMessage(message, message.getAllRecipients());
             }
+            System.out.println("Sent Successfully");
         }
         catch (AddressException e1) {
             e1.getStackTrace();
+            System.out.println("Failed");
         }
         catch (MessagingException e2) {
             e2.getStackTrace();
+            System.out.println("Failed");
         }
 }
 }
